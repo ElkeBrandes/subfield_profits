@@ -1,0 +1,109 @@
+---
+title: "Profitability distributions 2011-2014"
+author: "Elke Brandes"
+date: "Tuesday, October 04, 2016"
+output: html_document
+---
+
+This paper documents the process of graphically displaying profitability distributions in the years 2011-2014, based on the updated profit calculation. I am starting with a list of txt files that I have previously queried in the isuag postgreSQL database and exported to my directory on the [Heaton lab shared drive](.).
+
+First I create a list of the txt files I want to read in:
+```{r}
+file_list <- list.files(".", pattern = '01_profit_rounded_aggregated_201*')
+file_list
+```
+
+Then I read in the data of all txt files in the list, and give each table a name.
+```{r}
+data_list<- lapply(file_list, FUN=read.table, header = TRUE)
+names(data_list) <- c("profit11", "profit12", "profit13", "profit14")
+```
+
+To check the profitability values, I calculate the weighted mean  in each year. For 2011-2013, these are comparable with the mean yields published in Brandes et al 2016, but lower, since some assumptions were changed (e.g., regarding the management costs).
+```{r}
+means_list <- lapply(data_list, function(x) round(weighted.mean(x[,1],x[,2]),digits=2))
+means_vector <- unlist(means_list)
+means_vector
+```
+
+To check total areas, I calculate the sums in corn and soybean in each year. 
+```{r}
+total_areas_list <- lapply(data_list, function(x) round(sum(x[,2]),digits=2))
+total_areas_vector_p <- unlist(total_areas_list, recursive = TRUE, use.names = TRUE)
+total_areas_vector <- c(total_areas_vector_p[1], total_areas_vector_p[2], 
+                        total_areas_vector_p[3], total_areas_vector_p[4])
+total_areas_vector  
+```
+
+The function summary() gives some statistics:
+```{r}
+sapply(data_list, function(x) summary(x))
+```
+
+Packages needed for the plots:
+```{r}
+library("ggplot2")
+library("gridGraphics") # needed for the function unit
+```
+
+I am using a modified theme for ggplot that has black border, white background, and inward facing tick marks:
+```{r}
+theme_b_border_inward <- function (base_size = 12, base_family = "") 
+{
+  theme_grey(base_size = base_size, base_family = base_family) %+replace% 
+    theme(
+      axis.text = element_text(size = rel(0.8)), 
+      axis.ticks = element_line(colour = "black"),
+          axis.ticks.length=unit(-0.15, "cm"),
+      axis.ticks.margin=unit(0.5, "cm"),
+          legend.key = element_rect(colour = NA), panel.background = element_rect(fill = "white", 
+           colour = NA), panel.border = element_rect(fill = NA, 
+           colour = "black"), panel.grid.major = element_line(colour = NA, 
+           size = 0.2), panel.grid.minor = element_line(colour = NA, 
+           size = 0.5), strip.background = element_rect(fill = "grey80", 
+           colour = "grey50", size = 0.2))
+}
+```
+
+I prepare a data frame to be used for the facet plot:
+```{r}
+profit <- vector(mode="numeric", length=0)
+ for (i in seq(data_list))
+   profit <- append(profit, data_list[[i]][,1])
+  
+area <- vector(mode="numeric", length=0)
+ for (i in seq(data_list))
+   area <- append(area, data_list[[i]][,2])
+
+   
+profits_2011_2014 <- data.frame(year = c(rep("2011", sapply(data_list[1],nrow)), rep("2012", sapply(data_list[2],nrow)), 
+                                        rep("2013", sapply(data_list[3],nrow)), rep("2014", sapply(data_list[4],nrow))), 
+                                 profit,                             
+                                 area = area*1e-6) # this factor to show Mha
+
+head(profits_2011_2014)
+sum(profits_2011_2014$year == "2011", 4)
+```
+
+Then I plot the distributions:
+```{r}
+cuts <- data.frame(line = c("low","zero"), cut = c(-250,0))
+
+
+hi_profits <- ggplot(profits_2011_2014, aes(profit, weight = area, fill = "grey")) + 
+  geom_histogram(binwidth=50, position="identity") +
+  theme_b_border_inward() +
+#  ylim(0,1500000) + xlim(-1500,1800) +
+ scale_x_continuous(name="Profitability (US$/ha)") +
+  scale_y_continuous(name="Area (Mha)") +
+  theme(legend.position=" ") +
+  facet_wrap( ~ year, ncol=2) 
+
+hi_profits +
+#  scale_fill_manual(values=c("#E69F00", "#56B4E9"), name="", labels=c("Maize","Soybean")) +
+  geom_vline(data= cuts, aes(xintercept= cut, linetype = line),  show_guide = FALSE) 
+
+```
+
+The solid and dashed lines show the exemplary cut off profit of -250 and 0 US$/ha, respectively. 
+
