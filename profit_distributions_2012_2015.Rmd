@@ -1,0 +1,44 @@
+---
+title: "Profit distributions in Iowa, 2012-2015"
+author: "Elke Brandes"
+date: "Tuesday, November 01, 2016"
+output: html_document
+---
+This paper describes the calculation of profit distributions for 2012-2015 in Iowa.
+
+Using dplyr, I can access the PostgreSQL datbase to import the tables I need to produce the histograms. 
+
+1. Connect to the isuag database:
+```{r}
+library('dplyr')
+
+# Connect to local PostgreSQL via dplyr
+pw <- {
+  "5QUXJHTbxj"
+}
+isuag_db <- src_postgres(dbname = 'isuag',
+                           host = 'isu-ag-db.agsolver.com',
+                           port = 5432,
+                           user = 'isuag',
+                           password = pw)
+
+
+# this is not a data frame; it's a dplyr PostgreSQL handle into the database
+profit_mean_2012_2015 = tbl(isuag_db, "01_profit_mean_2012_2015_aggregated") 
+
+# this is a data frame
+profit_mean_2012_2015_df = as.data.frame(profit_mean_2012_2015)
+```
+The tbl() command lets you access tables in the database remotely, and sql() lets you send queries. For now, I don't need to send queries to the database since I have done that already in the database. I only need to read in the tables. But I can run some tests here, for example to check how large the area is that is on average unprofitable:
+
+```{r}
+# send a query through dplyr
+query = "SELECT SUM(sum_ha) FROM \"01_profit_mean_2012_2015_aggregated\" WHERE profit_mean_ha_rounded < 0"
+sum = tbl(isuag_db, sql(query))
+
+sum
+
+# shut down database
+rm(list=c('profit_mean_2012_2015','isuag_db')); gc() 
+```
+
