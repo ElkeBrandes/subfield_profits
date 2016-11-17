@@ -1,0 +1,77 @@
+---
+title: "Cash rents 2012 - 2015"
+author: "Elke Brandes"
+date: "November 17, 2016"
+output: html_document
+---
+1. Load required packages and connect to the isuag database:
+```{r connect, message = FALSE}
+library(dplyr)
+library(ggplot2)
+
+# Connect to local PostgreSQL via dplyr
+pw <- {
+
+}
+isuag_db <- src_postgres(dbname = 'isuag',
+                           host = 'isu-ag-db.agsolver.com',
+                           port = 5432,
+                           user = 'isuag',
+                           password = pw)
+
+```
+2. Use the dplyr PostgreSQL handle into the database and save it as a data frame:
+```{r}
+
+rents_csr = tbl(isuag_db, "01_csr_cash_rents_aggr_2012_2015") 
+rents_csr2 = tbl(isuag_db, "01_csr2_cash_rents_aggr_2012_2015")
+
+
+rents_csr_df = as.data.frame(rents_csr) %>%
+  na.omit() # delete rows with NA: those are areas without a CSR value assigned
+
+rents_csr2_df = as.data.frame(rents_csr2) %>%
+  na.omit()
+
+```
+3. Combine the two data frames into one, including a column that specifies if rent is calculated from CSR or CSR2.
+```{r}
+rents <- data.frame(csr = c(rep("csr", length(rents_csr_df$year)), rep("csr2", length(rents_csr2_df$year))),
+                   year = c(rents_csr_df$year, rents_csr2_df$year),
+                   ha = c(rents_csr_df$ha, rents_csr2_df$ha)*1e-6,
+                   rent = c(rents_csr_df$rent_csr_round, rents_csr2_df$rent_csr2_round))
+
+```
+4. Plot the distributions
+```{r rent_distributions, echo=FALSE, fig.cap="Figure 1: State-wide cash rent distributions: Comparison between cash rents calculated with CSR and CSR2 values. Subfield areas without a CSR value summed up to 142,282 ha whereas subfield areas without a CSR2 value were 171 ha in total."}
+
+theme_b_border <- function (base_size = 12, base_family = "") 
+{
+  theme_grey(base_size = base_size, base_family = base_family) %+replace% 
+    theme(
+      axis.text = element_text(size = rel(0.8), margin = margin(r=10)), #margin 
+      axis.ticks = element_line(colour = "black"),
+      axis.ticks.length = unit(0.15, "cm"),
+      legend.key = element_rect(colour = NA), panel.background = element_rect(fill = "white", 
+      colour = NA), panel.border = element_rect(fill = NA, 
+      colour = "black"), panel.grid.major = element_line(colour = NA, 
+      size = 0.2), panel.grid.minor = element_line(colour = NA, 
+      size = 0.5), strip.background = element_rect(fill = "grey80", 
+      colour = "grey50", size = 0.2))
+}
+
+
+ggplot(rents, aes(rent, weight = ha, fill=csr)) + 
+  geom_histogram(binwidth=20, alpha = .6, position="identity") +
+  theme_b_border() +
+ scale_x_continuous() +
+  scale_y_continuous() +
+  theme(legend.position="bottom") +
+  labs(x=expression(Cash~rent~("US$"~ha^{-1})),
+      y=expression(Area~(Mha))) +
+  facet_wrap( ~ year, ncol=2) +
+  scale_fill_manual(values=c("#E69F00", "#56B4E9"), name="", labels=c("CSR","CSR2"))
+
+
+```
+
